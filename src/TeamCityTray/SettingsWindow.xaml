@@ -21,6 +21,8 @@
 
         <CheckBox x:Name="OnlyMineBox" Content="Only my builds" Margin="0,0,0,4" />
         <CheckBox x:Name="LinkBox" Content="Link children by build number" Margin="0,0,0,4" />
+        <TextBlock Text="Bot accounts that queue child builds (comma-separated, optional)" Margin="0,4,0,0" />
+        <TextBox x:Name="BotBox" Margin="0,2,0,8" />
         <CheckBox x:Name="HideIdleBox" Content="Hide widget when nothing runs" Margin="0,0,0,4" />
         <CheckBox x:Name="TopBox" Content="Always on top" Margin="0,0,0,4" />
         <CheckBox x:Name="StartBox" Content="Start with Windows" Margin="0,0,0,8" />

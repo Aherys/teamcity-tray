@@ -4,7 +4,9 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,9 +15,13 @@ namespace TeamCityTray;
 public sealed class TeamCityClient : IDisposable
 {
     private const string BuildFields =
-        "build(id,buildTypeId,number,state,status,percentageComplete,webUrl,queuedDate,startDate," +
+        "build(id,buildTypeId,number,state,status,percentageComplete,webUrl,queuedDate,startDate,finishDate,comment(text)," +
         "triggered(type,user(username),build(id)),buildType(name,projectId,projectName)," +
         "snapshot-dependencies(build(id)),running-info(elapsedSeconds,estimatedTotalSeconds))";
+
+    private const string SeedFields =
+        "build(id,buildTypeId,number,state,status,webUrl,queuedDate,startDate,finishDate,comment(text)," +
+        "triggered(type,user(username)),buildType(name,projectId,projectName))";
 
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private string _key = "";
@@ -51,6 +57,72 @@ public sealed class TeamCityClient : IDisposable
     {
         using var doc = await GetJsonAsync("app/rest/buildQueue?fields=" + BuildFields, ct);
         return ParseBuilds(doc.RootElement, true);
+    }
+
+    // Recent builds of the current user, finished ones included. Returns an empty list when the server rejects the locator.
+    public async Task<List<BuildInfo>> GetRecentMineAsync(string username, DateTime now, CancellationToken ct)
+    {
+        var since = now.AddHours(-6).ToString("yyyyMMdd'T'HHmmss", CultureInfo.InvariantCulture) + "%2B0000";
+        var locator = $"user:(username:{Uri.EscapeDataString(username)}),defaultFilter:false,sinceDate:{since},count:50";
+        try
+        {
+            using var doc = await GetJsonAsync("app/rest/builds?locator=" + locator + "&fields=" + SeedFields, ct);
+            return ParseBuilds(doc.RootElement, false);
+        }
+        catch (HttpRequestException)
+        {
+            return new List<BuildInfo>();
+        }
+    }
+
+    // Queues the same build again as the current user.
+    public async Task QueueRerunAsync(long id, string number, CancellationToken ct)
+    {
+        using var doc = await GetJsonAsync(
+            $"app/rest/builds/id:{id}?fields=buildType(id),branchName,comment(text),properties(property(name,value))", ct);
+        var root = doc.RootElement;
+        var typeId = Obj(root, "buildType") is { } bt ? Str(bt, "id") : null;
+        if (string.IsNullOrEmpty(typeId))
+        {
+            throw new InvalidOperationException("The build has no build type.");
+        }
+
+        var comment = "Re-run of #" + number;
+        if (Obj(root, "comment") is { } c && Str(c, "text") is { Length: > 0 } original)
+        {
+            comment += " - " + original;
+        }
+        var body = new JsonObject
+        {
+            ["buildType"] = new JsonObject { ["id"] = typeId },
+            ["comment"] = new JsonObject { ["text"] = comment },
+        };
+        if (Str(root, "branchName") is { Length: > 0 } branch)
+        {
+            body["branchName"] = branch;
+        }
+        var props = new JsonArray();
+        if (Obj(root, "properties") is { } p && p.TryGetProperty("property", out var list) && list.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in list.EnumerateArray())
+            {
+                if (Str(item, "name") is { } name)
+                {
+                    props.Add(new JsonObject { ["name"] = name, ["value"] = Str(item, "value") ?? "" });
+                }
+            }
+        }
+        if (props.Count > 0)
+        {
+            body["properties"] = new JsonObject { ["property"] = props };
+        }
+
+        using var content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        using var response = await _http.PostAsync("app/rest/buildQueue", content, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException($"HTTP {(int)response.StatusCode} {response.ReasonPhrase}", null, response.StatusCode);
+        }
     }
 
     // Returns null when the build no longer exists (for example a removed queue entry).
@@ -127,7 +199,11 @@ public sealed class TeamCityClient : IDisposable
                 triggerBuild,
                 deps,
                 percent,
-                elapsed));
+                elapsed,
+                Obj(b, "comment") is { } cm ? Str(cm, "text") : null,
+                ParseDate(Str(b, "finishDate")),
+                string.Equals(Str(b, "state"), "finished", StringComparison.OrdinalIgnoreCase),
+                Str(b, "status")));
         }
         return result;
     }

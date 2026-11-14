@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,6 +15,7 @@ public sealed class Settings
     public int PollSeconds { get; set; } = 10;
     public bool OnlyMine { get; set; } = true;
     public bool LinkChildrenByNumber { get; set; } = true;
+    public string BotAccounts { get; set; } = "";
     public int KeepFinishedSeconds { get; set; } = 60;
     public bool HideWhenIdle { get; set; } = true;
     public bool Muted { get; set; }
@@ -23,6 +25,9 @@ public sealed class Settings
     public string FailureWavPath { get; set; } = "";
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
+
+    public HashSet<string> GetBotAccounts() =>
+        new(BotAccounts.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.OrdinalIgnoreCase);
 
     [JsonIgnore]
     public string Token

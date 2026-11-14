@@ -28,6 +28,10 @@ public sealed class RowViewModel : INotifyPropertyChanged
     public Brush BarBrush { get; private set; } = Blue;
     public bool ShowBar { get; private set; }
     public string? WebUrl { get; private set; }
+    public bool ShowDot { get; private set; } = true;
+    public string Glyph { get; private set; } = "";
+    public bool CanRerun { get; private set; }
+    public bool CanDismiss { get; private set; }
     public string ToolTip { get; private set; } = "";
 
     public RowViewModel(RowData data) => Update(data);
@@ -49,6 +53,11 @@ public sealed class RowViewModel : INotifyPropertyChanged
             RowState.Success => (Green, Green),
             _ => (Red, Red),
         };
+        var finished = d.State is RowState.Success or RowState.Failure;
+        ShowDot = !finished;
+        Glyph = d.State switch { RowState.Success => "\u2713", RowState.Failure => "\u2717", _ => "" };
+        CanRerun = finished;
+        CanDismiss = d.State == RowState.Failure;
         WebUrl = d.WebUrl;
         ToolTip = d.ToolTip;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));

@@ -6,9 +6,9 @@ A small Windows tray app that shows your running and queued TeamCity builds in a
 
 ## Features
 
-- Tray icon (generated in code) with Show/Hide widget, Settings, Mute sounds, Always on top, Hide when idle, Start with Windows, Reset position and Quit. Single instance.
-- Borderless dark widget docked bottom-right, draggable by a grip strip at the top or by any row, position remembered (clamped to the visible screens on load; **Reset position** in the tray menu). One row per build: status dot, build type, `#number`, progress bar, percent and elapsed time. Queued builds show `queued`. Child builds are indented under their root. Click a row to open the build in your browser.
-- Optional auto-hide when nothing runs. A small red `offline` line shows when the server is unreachable.
+- Tray icon (generated in code) with Show/Hide widget, Open TeamCity, Dismiss all, Settings, Mute sounds, Always on top, Hide when idle, Start with Windows, Reset position and Quit. Single instance.
+- Borderless dark widget docked bottom-right, draggable by a grip strip at the top or by any row, position remembered (clamped to the visible screens on load; **Reset position** in the tray menu). One row per build: status dot, build type, `#number`, progress bar, percent and elapsed time. Queued builds show `queued`. Child builds are indented under their root. Click a row to open the build in your browser. Hover buttons: open, re-run, dismiss.
+- Optional auto-hide when nothing runs. Failed builds stay visible until dismissed. A small red `offline` line shows when the server is unreachable.
 - Sounds are synthesized at startup. Custom `.wav` files can replace them. Several builds finishing in the same poll play one sound, and failure wins.
 
 ## Setup
@@ -42,11 +42,35 @@ With **Only my builds** enabled, a build is shown when one of these holds:
 
 1. **Trigger user.** `triggered.user.username` equals your username (case-insensitive). This is a root build.
 2. **Build relation.** It has a snapshot-dependency relation with one of your builds (either direction), or it was triggered by one of your builds (`triggered.build.id`).
-3. **Same run number** (option **Link children by build number**). Some setups queue child builds through a bot account, so children have no REST link to the parent. They do share the root's project and build number, and they are queued after it. A build with the same `projectId` and `number` as one of your roots, queued at or after the root, is treated as its child.
+3. **Child link.** Some setups queue child builds through a bot account, so children have no REST link to the parent. A build that you did not trigger is a child of one of your roots when it has the same `projectId`, was queued at or after the root, and one of these holds:
+   - **Same number** (option **Link children by build number**): same build `number` as the root.
+   - **Same comment**: same non-empty comment text as the root.
+   - **Bot account window**: the build was triggered by a user listed in **Bot accounts** (comma-separated, empty by default) and was queued between the root start and 120 s after the root finish, or the root still runs.
 
-The rules repeat until nothing new is found, so grandchildren are caught. Known roots are remembered for 6 hours, because a root can finish long before its children do.
+A child goes under the most recent root that matches. The rules repeat until nothing new is found, so grandchildren are caught.
 
-Builds that leave the running list are queried once for their final status. `SUCCESS` plays the success sound. Any other status, including canceled builds, plays the failure sound.
+Each poll also reads your builds of the last 6 hours from the server. A root that finished before the app started, or before the children appeared, is still found. If the server rejects this query, the app falls back to the roots it saw while they were active.
+
+A group shows its root at the top and its children indented. A finished root or child stays in the group as a row with a check mark or a cross, while any build of the group is queued or running. Then it stays for **Keep finished builds** seconds.
+
+## Failures
+
+- A build that finishes with a status other than `SUCCESS` (canceled builds included) plays the failure sound and stays on the widget until you dismiss it.
+- The widget stays visible while a failed row exists, even with **Hide widget when nothing runs**.
+- On a failure, the taskbar button flashes, the widget comes to the front and a red border pulses for 5 seconds. Successes do not flash.
+- Dismiss one row with its cross button, or use **Dismiss all** in the tray menu.
+
+Widget visibility: shown when a build is queued or running, or a failed row exists, or **Hide widget when nothing runs** is off.
+
+## Row buttons
+
+Hover a row to see its buttons. Drag still works on the grip and on the row.
+
+- **Open** (arrow): opens the build in your browser (http and https only). Clicking the row does the same. The tray menu has **Open TeamCity** for the server page.
+- **Re-run** (circular arrow, finished rows): asks for confirmation, then queues the same build type with the same branch and custom parameters. The comment starts with `Re-run of #<number>`. The new build is triggered by you, so it is a new root and appears on the next poll. An error shows the HTTP status.
+- **Dismiss** (cross, failed rows): hides the row.
+
+Builds that leave the running list are queried once for their final status. `SUCCESS` plays the success sound. Any other status plays the failure sound.
 
 ## License
 

@@ -17,7 +17,11 @@ public sealed record BuildInfo(
     long? TriggerBuildId,
     IReadOnlyList<long> Dependencies,
     int Percent,
-    int? ElapsedSeconds);
+    int? ElapsedSeconds,
+    string? Comment = null,
+    DateTime? Finished = null,
+    bool IsFinished = false,
+    string? Status = null);
 
 public sealed record FinalInfo(string State, string Status, string StatusText);
 

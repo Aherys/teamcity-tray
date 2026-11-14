@@ -37,6 +37,8 @@ public sealed class TrayController : IDisposable
             SettingsStore.Save(_settings);
         };
 
+        _widget.DismissRequested += id => _poller.Dismiss(id);
+        _widget.RerunRequested += OnRerunRequested;
         _toggleItem.Click += (_, _) => ToggleWidget();
         _muteItem.CheckOnClick = true;
         _muteItem.Checked = _settings.Muted;
@@ -65,6 +67,8 @@ public sealed class TrayController : IDisposable
 
         var menu = new ContextMenuStrip();
         menu.Items.Add(_toggleItem);
+        menu.Items.Add("Open TeamCity", null, (_, _) => OpenServer());
+        menu.Items.Add("Dismiss all", null, (_, _) => _poller.DismissAll());
         menu.Items.Add("Settings", null, (_, _) => ShowSettings());
         menu.Items.Add(_muteItem);
         menu.Items.Add(new ToolStripSeparator());
@@ -115,6 +119,8 @@ public sealed class TrayController : IDisposable
         Autostart.Apply(_settings.StartWithWindows);
         _poller.Updated += (rows, offline) =>
             System.Windows.Application.Current.Dispatcher.BeginInvoke(() => Apply(rows, offline));
+        _poller.BuildFailed += () =>
+            System.Windows.Application.Current.Dispatcher.BeginInvoke(OnBuildFailed);
         _poller.Start();
         UpdateVisibility();
 
@@ -133,8 +139,8 @@ public sealed class TrayController : IDisposable
 
     private void UpdateVisibility()
     {
-        // Finished rows and the offline line alone do not keep the widget visible.
-        var hasContent = _rows.Any(r => r.State is RowState.Queued or RowState.Running) || !_settings.HideWhenIdle;
+        // Undismissed failures keep the widget visible. Finished successes and the offline line do not.
+        var hasContent = _rows.Any(r => r.State is RowState.Queued or RowState.Running or RowState.Failure) || !_settings.HideWhenIdle;
         if (_userVisible && hasContent)
         {
             if (!_widget.IsVisible)
@@ -145,6 +151,49 @@ public sealed class TrayController : IDisposable
         else if (_widget.IsVisible)
         {
             _widget.Hide();
+        }
+    }
+
+    private void OnBuildFailed()
+    {
+        _userVisible = true;
+        UpdateVisibility();
+        if (!_widget.IsVisible)
+        {
+            _widget.Show();
+        }
+        _widget.Topmost = true;
+        _widget.Topmost = _settings.AlwaysOnTop;
+        _widget.NotifyFailure();
+    }
+
+    private async void OnRerunRequested(RowViewModel row)
+    {
+        var label = row.Name + (row.Number.Length > 0 ? " " + row.Number : "");
+        var answer = System.Windows.MessageBox.Show(
+            "Re-run " + label + "?", "TeamCity Tray", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+        if (answer != System.Windows.MessageBoxResult.Yes)
+        {
+            return;
+        }
+        try
+        {
+            await _poller.RerunAsync(row.Id, row.Number.TrimStart('#'));
+        }
+        catch (Exception ex)
+        {
+            var status = ex is System.Net.Http.HttpRequestException { StatusCode: { } code } ? "HTTP " + (int)code : ex.GetType().Name;
+            System.Windows.MessageBox.Show(
+                "Re-run failed: " + status, "TeamCity Tray", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+        }
+    }
+
+    private void OpenServer()
+    {
+        if (Uri.TryCreate(_settings.ServerUrl.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         }
     }
 

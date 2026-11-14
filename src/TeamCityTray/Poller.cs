@@ -15,9 +15,14 @@ public sealed class Poller : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private string _userKey = "";
     private string _user = "";
+    private bool _offline;
+    private readonly SemaphoreSlim _wake = new(0, 1);
 
     // Raised on a background thread.
     public event Action<IReadOnlyList<RowData>, bool>? Updated;
+
+    // Raised on a background thread when a build of the user finished with a non-success status.
+    public event Action? BuildFailed;
 
     public Poller(Settings settings, SoundService sound)
     {
@@ -35,13 +40,52 @@ public sealed class Poller : IDisposable
             await PollOnceAsync(ct);
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(Math.Max(3, _settings.PollSeconds)), ct);
+                await _wake.WaitAsync(TimeSpan.FromSeconds(Math.Max(3, _settings.PollSeconds)), ct);
             }
             catch (OperationCanceledException)
             {
                 return;
             }
         }
+    }
+
+    public void PollNow()
+    {
+        try
+        {
+            _wake.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+        }
+    }
+
+    public void Dismiss(long id)
+    {
+        _tracker.Dismiss(id);
+        Republish();
+    }
+
+    public void DismissAll()
+    {
+        _tracker.DismissFailures();
+        Republish();
+    }
+
+    public async Task RerunAsync(long id, string number)
+    {
+        _client.Configure(_settings.ServerUrl, _settings.Token);
+        await _client.QueueRerunAsync(id, number, _cts.Token);
+        PollNow();
+    }
+
+    private void Republish() =>
+        Updated?.Invoke(_tracker.Snapshot(DateTime.UtcNow, _settings.KeepFinishedSeconds), _offline);
+
+    private void Publish(bool offline, DateTime now)
+    {
+        _offline = offline;
+        Updated?.Invoke(_tracker.Snapshot(now, _settings.KeepFinishedSeconds), offline);
     }
 
     private async Task PollOnceAsync(CancellationToken ct)
@@ -51,6 +95,7 @@ public sealed class Poller : IDisposable
         {
             if (string.IsNullOrWhiteSpace(_settings.ServerUrl) || string.IsNullOrEmpty(_settings.Token))
             {
+                _offline = false;
                 Updated?.Invoke(Array.Empty<RowData>(), false);
                 return;
             }
@@ -65,8 +110,10 @@ public sealed class Poller : IDisposable
 
             var running = await _client.GetRunningAsync(ct);
             var queued = await _client.GetQueuedAsync(ct);
-            var options = new TrackerOptions(_settings.OnlyMine, _settings.LinkChildrenByNumber, _settings.KeepFinishedSeconds);
-            _tracker.Update(running.Concat(queued).ToList(), _user, options, now);
+            var seeds = _settings.OnlyMine ? await _client.GetRecentMineAsync(_user, now, ct) : new List<BuildInfo>();
+            var options = new TrackerOptions(
+                _settings.OnlyMine, _settings.LinkChildrenByNumber, _settings.KeepFinishedSeconds, _settings.GetBotAccounts());
+            _tracker.Update(running.Concat(queued).ToList(), seeds, _user, options, now);
 
             var anySuccess = false;
             var anyFailure = false;
@@ -98,14 +145,18 @@ public sealed class Poller : IDisposable
             {
                 _sound.Play(anyFailure);
             }
-            Updated?.Invoke(_tracker.Snapshot(now, _settings.KeepFinishedSeconds), false);
+            Publish(false, now);
+            if (anyFailure)
+            {
+                BuildFailed?.Invoke();
+            }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
         }
         catch (Exception)
         {
-            Updated?.Invoke(_tracker.Snapshot(now, _settings.KeepFinishedSeconds), true);
+            Publish(true, now);
         }
     }
 
@@ -114,5 +165,6 @@ public sealed class Poller : IDisposable
         _cts.Cancel();
         _client.Dispose();
         _cts.Dispose();
+        _wake.Dispose();
     }
 }

@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
         KeepBox.Text = settings.KeepFinishedSeconds.ToString();
         OnlyMineBox.IsChecked = settings.OnlyMine;
         LinkBox.IsChecked = settings.LinkChildrenByNumber;
+        BotBox.Text = settings.BotAccounts;
         HideIdleBox.IsChecked = settings.HideWhenIdle;
         TopBox.IsChecked = settings.AlwaysOnTop;
         StartBox.IsChecked = settings.StartWithWindows;
@@ -54,6 +55,7 @@ public partial class SettingsWindow : Window
         _settings.KeepFinishedSeconds = Math.Clamp(ParseInt(KeepBox.Text, 60), 0, 3600);
         _settings.OnlyMine = OnlyMineBox.IsChecked == true;
         _settings.LinkChildrenByNumber = LinkBox.IsChecked == true;
+        _settings.BotAccounts = BotBox.Text.Trim();
         _settings.HideWhenIdle = HideIdleBox.IsChecked == true;
         _settings.AlwaysOnTop = TopBox.IsChecked == true;
         _settings.StartWithWindows = StartBox.IsChecked == true;
