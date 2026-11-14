@@ -1,0 +1,52 @@
+<Window x:Class="TeamCityTray.WidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:TeamCityTray"
+        Title="TeamCity Tray" Width="360" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize"
+        FontFamily="Segoe UI" FontSize="11">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="B2V" />
+    </Window.Resources>
+    <Border Background="#EB1E2128" CornerRadius="6" BorderBrush="#33FFFFFF" BorderThickness="1"
+            Padding="6,4" MouseLeftButtonDown="OnMouseDown">
+        <StackPanel>
+            <Grid Margin="0,0,0,2">
+                <TextBlock Text="TeamCity" Foreground="#6E7788" FontSize="10" />
+                <TextBlock Text="offline" Foreground="#F85149" FontSize="10" HorizontalAlignment="Right"
+                           Visibility="{Binding IsOffline, Converter={StaticResource B2V}}" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:RowViewModel}">
+                        <Grid Height="20" Background="Transparent" Margin="{Binding Indent}" ToolTip="{Binding ToolTip}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="56" />
+                                <ColumnDefinition Width="44" />
+                                <ColumnDefinition Width="34" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Width="8" Height="8" Fill="{Binding DotBrush}" />
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="#DDE3EE"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="4,0,6,0" />
+                            <TextBlock Grid.Column="2" Text="{Binding Number}" Foreground="#8A94A6"
+                                       VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ProgressBar Grid.Column="3" Height="4" Minimum="0" Maximum="100" Value="{Binding Percent, Mode=OneWay}"
+                                         Foreground="{Binding BarBrush}" Background="#33FFFFFF" BorderThickness="0"
+                                         Visibility="{Binding ShowBar, Converter={StaticResource B2V}}" />
+                            <TextBlock Grid.Column="4" Text="{Binding PercentText}" Foreground="#C5CCD8"
+                                       FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="5" Text="{Binding ElapsedText}" Foreground="#8A94A6"
+                                       FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="idle" Foreground="#6E7788" FontSize="10" Margin="0,2,0,0"
+                       Visibility="{Binding IsIdle, Converter={StaticResource B2V}}" />
+        </StackPanel>
+    </Border>
+</Window>
