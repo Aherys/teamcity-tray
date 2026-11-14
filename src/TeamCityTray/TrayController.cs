@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -23,7 +24,6 @@ public sealed class TrayController : IDisposable
     private SettingsWindow? _settingsWindow;
     private bool _userVisible = true;
     private IReadOnlyList<RowData> _rows = Array.Empty<RowData>();
-    private bool _offline;
 
     public TrayController()
     {
@@ -127,14 +127,14 @@ public sealed class TrayController : IDisposable
     private void Apply(IReadOnlyList<RowData> rows, bool offline)
     {
         _rows = rows;
-        _offline = offline;
         _viewModel.Apply(rows, offline);
         UpdateVisibility();
     }
 
     private void UpdateVisibility()
     {
-        var hasContent = _rows.Count > 0 || _offline || !_settings.HideWhenIdle;
+        // Finished rows and the offline line alone do not keep the widget visible.
+        var hasContent = _rows.Any(r => r.State is RowState.Queued or RowState.Running) || !_settings.HideWhenIdle;
         if (_userVisible && hasContent)
         {
             if (!_widget.IsVisible)
