@@ -17,6 +17,8 @@ public sealed class Settings
     public int KeepFinishedSeconds { get; set; } = 60;
     public bool HideWhenIdle { get; set; } = true;
     public bool Muted { get; set; }
+    public bool StartWithWindows { get; set; } = true;
+    public bool AlwaysOnTop { get; set; } = true;
     public string SuccessWavPath { get; set; } = "";
     public string FailureWavPath { get; set; } = "";
     public double? WindowLeft { get; set; }

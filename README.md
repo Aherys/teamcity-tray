@@ -6,8 +6,8 @@ A small Windows tray app that shows your running and queued TeamCity builds in a
 
 ## Features
 
-- Tray icon (generated in code) with Show/Hide widget, Settings, Mute sounds and Quit. Single instance.
-- Borderless dark widget docked bottom-right, draggable, position remembered. One row per build: status dot, build type, `#number`, progress bar, percent and elapsed time. Queued builds show `queued`. Child builds are indented under their root. Click a row to open the build in your browser.
+- Tray icon (generated in code) with Show/Hide widget, Settings, Mute sounds, Always on top, Hide when idle, Start with Windows, Reset position and Quit. Single instance.
+- Borderless dark widget docked bottom-right, draggable by a grip strip at the top or by any row, position remembered (clamped to the visible screens on load; **Reset position** in the tray menu). One row per build: status dot, build type, `#number`, progress bar, percent and elapsed time. Queued builds show `queued`. Child builds are indented under their root. Click a row to open the build in your browser.
 - Optional auto-hide when nothing runs. A small red `offline` line shows when the server is unreachable.
 - Sounds are synthesized at startup. Custom `.wav` files can replace them. Several builds finishing in the same poll play one sound, and failure wins.
 
@@ -19,6 +19,13 @@ A small Windows tray app that shows your running and queued TeamCity builds in a
 4. Save.
 
 Settings live in `%APPDATA%\TeamCityTray\settings.json`. The token is encrypted with DPAPI (current Windows user) and is never logged.
+
+## Install
+
+Run `./install.ps1` from the repo root. It publishes to `%LOCALAPPDATA%\TeamCityTray`, stops any running instance, and starts the new exe. The app registers itself to start with Windows on first run (`HKCU\...\Run`, value `TeamCityTray`). The registered path follows the current exe at each start.
+
+- **Update:** run `./install.ps1` again.
+- **Uninstall:** untick **Start with Windows** (Settings or tray menu), quit the app, and delete `%LOCALAPPDATA%\TeamCityTray`.
 
 ## Build
 

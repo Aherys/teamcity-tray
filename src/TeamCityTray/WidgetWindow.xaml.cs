@@ -12,10 +12,11 @@ public partial class WidgetWindow : Window
 
     public event Action? PositionChanged;
 
-    public WidgetWindow(WidgetViewModel viewModel, double? left, double? top)
+    public WidgetWindow(WidgetViewModel viewModel, double? left, double? top, bool alwaysOnTop)
     {
         InitializeComponent();
         DataContext = viewModel;
+        Topmost = alwaysOnTop;
 
         if (left is { } l && top is { } t && IsOnScreen(l, t))
         {
@@ -27,8 +28,15 @@ public partial class WidgetWindow : Window
     }
 
     private static bool IsOnScreen(double left, double top) =>
-        left >= SystemParameters.VirtualScreenLeft - 20 && left < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 40
-        && top >= SystemParameters.VirtualScreenTop - 20 && top < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 20;
+        left + 40 >= SystemParameters.VirtualScreenLeft && left + 40 < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth
+        && top + 10 >= SystemParameters.VirtualScreenTop && top + 10 < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight;
+
+    public void ResetPosition()
+    {
+        _userPlaced = false;
+        KeepInPlace();
+        PositionChanged?.Invoke();
+    }
 
     private void KeepInPlace()
     {
@@ -38,9 +46,14 @@ public partial class WidgetWindow : Window
             Left = area.Right - ActualWidth - ScreenGap;
             Top = area.Bottom - ActualHeight - ScreenGap;
         }
-        else if (Top + ActualHeight > area.Bottom)
+        else
         {
-            Top = Math.Max(area.Top, area.Bottom - ActualHeight);
+            var minLeft = SystemParameters.VirtualScreenLeft;
+            var minTop = SystemParameters.VirtualScreenTop;
+            var maxLeft = minLeft + SystemParameters.VirtualScreenWidth - ActualWidth;
+            var maxTop = minTop + SystemParameters.VirtualScreenHeight - ActualHeight;
+            Left = Math.Clamp(Left, minLeft, Math.Max(minLeft, maxLeft));
+            Top = Math.Clamp(Top, minTop, Math.Max(minTop, maxTop));
         }
     }
 
@@ -50,6 +63,7 @@ public partial class WidgetWindow : Window
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
         var row = (e.OriginalSource as FrameworkElement)?.DataContext as RowViewModel;
+        var onGrip = Grip.IsMouseOver;
         var (left, top) = (Left, Top);
         try
         {
@@ -65,7 +79,7 @@ public partial class WidgetWindow : Window
             _userPlaced = true;
             PositionChanged?.Invoke();
         }
-        else if (row?.WebUrl is { Length: > 0 } url && Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        else if (!onGrip && row?.WebUrl is { Length: > 0 } url && Uri.TryCreate(url, UriKind.Absolute, out var uri)
                  && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });

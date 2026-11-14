@@ -23,6 +23,8 @@ public partial class SettingsWindow : Window
         OnlyMineBox.IsChecked = settings.OnlyMine;
         LinkBox.IsChecked = settings.LinkChildrenByNumber;
         HideIdleBox.IsChecked = settings.HideWhenIdle;
+        TopBox.IsChecked = settings.AlwaysOnTop;
+        StartBox.IsChecked = settings.StartWithWindows;
         SuccessBox.Text = settings.SuccessWavPath;
         FailureBox.Text = settings.FailureWavPath;
     }
@@ -53,6 +55,8 @@ public partial class SettingsWindow : Window
         _settings.OnlyMine = OnlyMineBox.IsChecked == true;
         _settings.LinkChildrenByNumber = LinkBox.IsChecked == true;
         _settings.HideWhenIdle = HideIdleBox.IsChecked == true;
+        _settings.AlwaysOnTop = TopBox.IsChecked == true;
+        _settings.StartWithWindows = StartBox.IsChecked == true;
         _settings.SuccessWavPath = SuccessBox.Text.Trim();
         _settings.FailureWavPath = FailureBox.Text.Trim();
         SettingsStore.Save(_settings);

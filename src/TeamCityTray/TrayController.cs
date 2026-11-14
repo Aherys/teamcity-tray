@@ -17,6 +17,9 @@ public sealed class TrayController : IDisposable
     private readonly NotifyIcon _icon;
     private readonly ToolStripMenuItem _toggleItem = new("Show/Hide widget");
     private readonly ToolStripMenuItem _muteItem = new("Mute sounds");
+    private readonly ToolStripMenuItem _topItem = new("Always on top");
+    private readonly ToolStripMenuItem _idleItem = new("Hide when idle");
+    private readonly ToolStripMenuItem _startItem = new("Start with Windows");
     private SettingsWindow? _settingsWindow;
     private bool _userVisible = true;
     private IReadOnlyList<RowData> _rows = Array.Empty<RowData>();
@@ -26,7 +29,7 @@ public sealed class TrayController : IDisposable
     {
         _sound = new SoundService(_settings);
         _poller = new Poller(_settings, _sound);
-        _widget = new WidgetWindow(_viewModel, _settings.WindowLeft, _settings.WindowTop);
+        _widget = new WidgetWindow(_viewModel, _settings.WindowLeft, _settings.WindowTop, _settings.AlwaysOnTop);
         _widget.PositionChanged += () =>
         {
             _settings.WindowLeft = _widget.SavedLeft;
@@ -43,10 +46,32 @@ public sealed class TrayController : IDisposable
             SettingsStore.Save(_settings);
         };
 
+        WireCheckItem(_topItem, v =>
+        {
+            _settings.AlwaysOnTop = v;
+            _widget.Topmost = v;
+        });
+        WireCheckItem(_idleItem, v =>
+        {
+            _settings.HideWhenIdle = v;
+            UpdateVisibility();
+        });
+        WireCheckItem(_startItem, v =>
+        {
+            _settings.StartWithWindows = v;
+            Autostart.Apply(v);
+        });
+        SyncMenu();
+
         var menu = new ContextMenuStrip();
         menu.Items.Add(_toggleItem);
         menu.Items.Add("Settings", null, (_, _) => ShowSettings());
         menu.Items.Add(_muteItem);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(_topItem);
+        menu.Items.Add(_idleItem);
+        menu.Items.Add(_startItem);
+        menu.Items.Add("Reset position", null, (_, _) => _widget.ResetPosition());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => System.Windows.Application.Current.Shutdown());
 
@@ -60,8 +85,34 @@ public sealed class TrayController : IDisposable
         };
     }
 
+    private void WireCheckItem(ToolStripMenuItem item, Action<bool> apply)
+    {
+        item.CheckOnClick = true;
+        item.Click += (_, _) =>
+        {
+            apply(item.Checked);
+            SettingsStore.Save(_settings);
+        };
+    }
+
+    private void SyncMenu()
+    {
+        _topItem.Checked = _settings.AlwaysOnTop;
+        _idleItem.Checked = _settings.HideWhenIdle;
+        _startItem.Checked = _settings.StartWithWindows;
+    }
+
+    private void OnSettingsSaved()
+    {
+        SyncMenu();
+        _widget.Topmost = _settings.AlwaysOnTop;
+        Autostart.Apply(_settings.StartWithWindows);
+        UpdateVisibility();
+    }
+
     public void Start()
     {
+        Autostart.Apply(_settings.StartWithWindows);
         _poller.Updated += (rows, offline) =>
             System.Windows.Application.Current.Dispatcher.BeginInvoke(() => Apply(rows, offline));
         _poller.Start();
@@ -110,7 +161,7 @@ public sealed class TrayController : IDisposable
             _settingsWindow.Activate();
             return;
         }
-        _settingsWindow = new SettingsWindow(_settings, UpdateVisibility);
+        _settingsWindow = new SettingsWindow(_settings, OnSettingsSaved);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();

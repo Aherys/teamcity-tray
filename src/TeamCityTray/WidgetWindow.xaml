@@ -4,17 +4,20 @@
         xmlns:local="clr-namespace:TeamCityTray"
         Title="TeamCity Tray" Width="360" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize"
+        ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize"
         FontFamily="Segoe UI" FontSize="11">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="B2V" />
     </Window.Resources>
     <Border Background="#EB1E2128" CornerRadius="6" BorderBrush="#33FFFFFF" BorderThickness="1"
-            Padding="6,4" MouseLeftButtonDown="OnMouseDown">
+            Padding="6,0,6,4" MouseLeftButtonDown="OnMouseDown">
         <StackPanel>
-            <Grid Margin="0,0,0,2">
-                <TextBlock Text="TeamCity" Foreground="#6E7788" FontSize="10" />
-                <TextBlock Text="offline" Foreground="#F85149" FontSize="10" HorizontalAlignment="Right"
+            <Grid x:Name="Grip" Height="14" Margin="0,0,0,2" Background="Transparent" Cursor="SizeAll"
+                  ToolTip="Drag to move">
+                <TextBlock Text="&#x22EE;&#x22EE;" Foreground="#6E7788" FontSize="10" FontWeight="Bold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <TextBlock Text="TeamCity" Foreground="#6E7788" FontSize="9" VerticalAlignment="Center" />
+                <TextBlock Text="offline" Foreground="#F85149" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"
                            Visibility="{Binding IsOffline, Converter={StaticResource B2V}}" />
             </Grid>
             <ItemsControl ItemsSource="{Binding Rows}">
